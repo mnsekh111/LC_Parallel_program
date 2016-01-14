@@ -1,0 +1,16 @@
+[1] 28104
+[1]  + Done                          /etc/init.d/iptables restart >& /dev/null
+hello
+
+PBS JOB id is 281696.arcs.csc.ncsu.edu
+PBS_NODEFILE is /opt/torque/aux//281696.arcs.csc.ncsu.edu
+PBS_QUEUE is default
+
+compute-0-82.local
+
+compute-0-82.local
+compute-0-82.local
+NPROCS: 2
+
+[1] 28363
+[1]  + Done                          /etc/init.d/iptables restart > /dev/null
