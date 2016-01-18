@@ -22,13 +22,13 @@ int main(int argc, char * argv[]) {
 	MPI_Comm_size(MPI_COMM_WORLD, &num_tasks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &task_id);
 
-	printf("%d", num_tasks);
+//	printf("%d", num_tasks);
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	int msg_size = 32;
 	int curr_pair = 0;
 	for (k = 0; k < num_tasks / 2; k++) {
-		if (task_id == curr_pair || task_id == curr_pair+1) {
+		if (task_id == curr_pair || task_id == curr_pair + 1) {
 			for (j = 0; j < MSG_SIZES; j++) {
 				for (i = 0; i < REPS; i++) {
 					if (task_id % 2 == 0) {
@@ -96,15 +96,14 @@ int main(int argc, char * argv[]) {
 
 		if (task_id == curr_pair) {
 			for (j = 0; j < MSG_SIZES; j++) {
-				printf("%d %f\n",(int)(32*pow(2,j)), size_time_table[j] / 10);
+				printf("%d %f\n", (int) (32 * pow(2, j)),
+						size_time_table[j] / 10);
 			}
 		}
 
 		MPI_Barrier(MPI_COMM_WORLD);
 		curr_pair += 2;
 	}
-
-
 
 	MPI_Finalize();
 	return 0;
