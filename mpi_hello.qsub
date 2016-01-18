@@ -6,11 +6,11 @@
 #job name
 #PBS -N mpi_hello
 #2 processes (mapped onto two cores of the same node) for 5 minutes
-#PBS -l nodes=2,walltime=00:05:00
+#PBS -l nodes=4,walltime=00:05:00
 #Q name
 #PBS -q default
 #your email
-#PBS -M <your@email>
+#PBS -M smnatara@ncsu.edu
 #error handling
 #PBS -m abe
 #output file
@@ -32,4 +32,4 @@ cat $PBS_NODEFILE
 echo NPROCS: $NPROCS
 
 echo
-mpirun -np $NPROCS -hostfile $PBS_NODEFILE <your/program/directory>/mpi_hello
+mpirun -np $NPROCS -hostfile $PBS_NODEFILE ~/LC-ParallelProgs/mpi_hello

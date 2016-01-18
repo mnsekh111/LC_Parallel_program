@@ -1,16 +1,23 @@
-[1] 28104
+[1] 27783
 [1]  + Done                          /etc/init.d/iptables restart >& /dev/null
 hello
 
-PBS JOB id is 281696.arcs.csc.ncsu.edu
-PBS_NODEFILE is /opt/torque/aux//281696.arcs.csc.ncsu.edu
+PBS JOB id is 282236.arcs.csc.ncsu.edu
+PBS_NODEFILE is /opt/torque/aux//282236.arcs.csc.ncsu.edu
 PBS_QUEUE is default
 
-compute-0-82.local
+compute-0-10.local
 
-compute-0-82.local
-compute-0-82.local
-NPROCS: 2
+compute-0-10.local
+compute-0-10.local
+compute-0-10.local
+compute-0-10.local
+NPROCS: 4
 
-[1] 28363
+Hello from task 3 on compute-0-10.local!
+Hello from task 0 on compute-0-10.local!
+MASTER: Number of MPI tasks is: 4
+Hello from task 1 on compute-0-10.local!
+Hello from task 2 on compute-0-10.local!
+[1] 28054
 [1]  + Done                          /etc/init.d/iptables restart > /dev/null
