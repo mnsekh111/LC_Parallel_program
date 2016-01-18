@@ -93,15 +93,18 @@ int main(int argc, char * argv[]) {
 				msg_size *= 2;
 			}
 		}
-		if (task_id % 2 == 0) {
+
+		if (task_id == curr_pair) {
 			for (j = 0; j < MSG_SIZES; j++) {
-				printf("%f\n", size_time_table[j] / 10);
+				printf("%d %f\n",(int)(32*pow(2,j)), size_time_table[j] / 10);
 			}
 		}
-		printf("\n");
+
 		MPI_Barrier(MPI_COMM_WORLD);
 		curr_pair += 2;
 	}
+
+
 
 	MPI_Finalize();
 	return 0;
