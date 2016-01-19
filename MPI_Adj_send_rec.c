@@ -1,10 +1,3 @@
-/*
- * MPI_Adj_send_rec.c
- *
- *  Created on: Jan 18, 2016
- *      Author: mns
- */
-
 #include "mpi.h"
 #include <stdio.h>
 #include <limits.h>
@@ -46,7 +39,7 @@ int main(int argc, char* argv[]) {
 			next_task * 1000 + taskId, MPI_COMM_WORLD, &reqs[1]);
 
 	for (i = 1; i <= NGRID / totaltasks; i++) {
-		xc[i] = XI + (XF - XI) * (FP_PREC) (i - 1) / (FP_PREC) (NGRID - 1);
+		xc[i] = (XI + (XF - XI) * (FP_PREC) (i - 1) / (FP_PREC) (NGRID - 1))*(taskId+1);
 	}
 
 	MPI_Isend(&xc[1], 1, MPI_DOUBLE, prev_task, taskId * 1000 + prev_task,
@@ -90,4 +83,3 @@ FP_PREC ifn(FP_PREC a, FP_PREC b) {
 	return (2. / 3.) * (pow(sqrt(b), 3) - pow(sqrt(a), 3));
 //  return 0.5 * (b*b - a*a);
 }
-
