@@ -55,6 +55,7 @@ int main(int argc, char *argv[]) {
 
 	MPI_Irecv(&yc[0], 1, MPI_DOUBLE, prev_task, prev_task * 1000 + taskId,
 	MPI_COMM_WORLD, &reqs[0]);
+
 	MPI_Irecv(&yc[NGRID / totaltasks + 1], 1, MPI_DOUBLE, next_task,
 			next_task * 1000 + taskId, MPI_COMM_WORLD, &reqs[1]);
 
@@ -70,12 +71,23 @@ int main(int argc, char *argv[]) {
 
 	MPI_Isend(&yc[1], 1, MPI_DOUBLE, prev_task, taskId * 1000 + prev_task,
 	MPI_COMM_WORLD, &reqs[2]);
+
 	MPI_Isend(&yc[NGRID / totaltasks], 1, MPI_DOUBLE, next_task,
 			taskId * 1000 + next_task, MPI_COMM_WORLD, &reqs[3]);
 
 	MPI_Waitall(4, reqs, stats);
 
 	dx = xc[2] - xc[1];
+	if (taskId == ROOT){
+		xc[0] = xc[1] - dx;
+		yc[0] = fn(xc[0]);
+	}
+	if (taskId == totaltasks - 1){
+		xc[NGRID / totaltasks + 1] = xc[NGRID / totaltasks] + dx;
+		yc[NGRID / totaltasks + 1] = fn(xc[NGRID/totaltasks + 1]);
+	}
+
+
 
 	//compute the derivative using first-order finite differencing
 	for (i = 1; i <= NGRID / totaltasks; i++) {
@@ -90,22 +102,22 @@ int main(int argc, char *argv[]) {
 
 	//compute the errors
 	for (i = 1; i <= NGRID / totaltasks; i++) {
-		derr[i] = fabs(dfn(xc[i])-dyc[i]) / dfn(xc[i]);
+		derr[i] = fabs(dfn(xc[i]) - dyc[i]) / dfn(xc[i]);
 		dyco[i] = dfn(xc[i]);
 	}
 
 	//find the average error
 	davg_err = 0.0;
-	for (i = 1; i <= NGRID/totaltasks; i++)
+	for (i = 1; i <= NGRID / totaltasks; i++)
 		davg_err += derr[i];
 
-	davg_err /= (FP_PREC) (NGRID/totaltasks);
+	davg_err /= (FP_PREC) (NGRID / totaltasks);
 	intg_err = fabs((ifn(XI, XF) - intg) / ifn(XI, XF));
 
-	for(i=1;i<=NGRID/totaltasks;i++){
-		fprintf(stdout, "%f %f %f %f %f\n", xc[i], yc[i], dyc[i],dyco[i],derr[i]);
+	for (i = 1; i <= NGRID / totaltasks; i++) {
+		fprintf(stdout, "%f %f %f %f %f\n", xc[i], yc[i], dyc[i], dyco[i],
+				derr[i]);
 	}
-
 
 	MPI_Finalize();
 }
