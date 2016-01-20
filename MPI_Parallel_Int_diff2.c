@@ -113,6 +113,7 @@ int main(int argc, char *argv[]) {
 
 	} else {
 
+		FP_PREC allxc[NGRID];
 		FP_PREC allderr[NGRID];
 		FP_PREC alliintg[totaltasks];
 		FP_PREC davg_err = 0.0;
@@ -133,7 +134,7 @@ int main(int argc, char *argv[]) {
 			allderr[i] = derr[i + 1];
 		}
 
-		for (i = 1; i <totaltasks; i++) {
+		for (i = 1; i < totaltasks; i++) {
 			intg += alliintg[i];
 		}
 
@@ -153,12 +154,12 @@ int main(int argc, char *argv[]) {
 
 		intg_err = fabs((ifn(XI, XF) - intg) / ifn(XI, XF));
 
-		//print_error_data(NGRID, davg_err, dstd_dev, &xc[1], derr, intg_err);
-		fprintf(stdout, "%e\n%e\n%e\n", davg_err, dstd_dev, intg_err);
 		for (i = 0; i < NGRID; i++) {
-			fprintf(stdout, "%e %e \n", i, allderr[i]);
+			allxc[i] = XI + (XF - XI) * (FP_PREC) i / (FP_PREC) (NGRID - 1);
 		}
 
+		//print_error_data(NGRID, davg_err, dstd_dev, &xc[1], derr, intg_err);
+		print_error_data(NGRID,davg_err,dstd_dev,allxc,allderr,intg_err);
 	}
 
 	MPI_Finalize();
