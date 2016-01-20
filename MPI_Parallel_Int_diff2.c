@@ -42,7 +42,6 @@ int main(int argc, char *argv[]) {
 	FP_PREC dyc[NGRID / totaltasks + 2];
 	FP_PREC derr[NGRID / totaltasks + 2];
 
-	FP_PREC intg_err;
 	FP_PREC intg;
 	FP_PREC dx;
 
@@ -102,41 +101,62 @@ int main(int argc, char *argv[]) {
 		derr[i] = fabs(dfn(xc[i]) - dyc[i]) / dfn(xc[i]);
 	}
 
-	intg_err = fabs((ifn(XI, XF) - intg) / ifn(XI, XF));
-
 	if (taskId != ROOT) {
 		MPI_Isend(&derr[0], NGRID / totaltasks, MPI_DOUBLE, ROOT,
 				taskId * 1000 + ROOT,
 				MPI_COMM_WORLD, &reqs[0]);
-		MPI_Isend(&intg_err, 1, MPI_DOUBLE, next_task, taskId * 1000 + ROOT,
+		MPI_Isend(&intg, 1, MPI_DOUBLE, next_task, taskId * 1000 + ROOT,
 		MPI_COMM_WORLD, &reqs[1]);
 
-		MPI_Wait(&reqs[0],&stats[0]);
-		MPI_Wait(&reqs[1],&stats[1]);
+		MPI_Wait(&reqs[0], &stats[0]);
+		MPI_Wait(&reqs[1], &stats[1]);
 
 	} else {
 
 		FP_PREC allderr[NGRID];
-		FP_PREC alliintg_err[totaltasks];
+		FP_PREC alliintg[totaltasks];
+		FP_PREC davg_err = 0.0;
+		FP_PREC dstd_dev = 0.0;
+		FP_PREC intg_err = 0.0;
 		MPI_Request reqs[2 * (totaltasks - 1)];
 		MPI_Status stats[2 * (totaltasks - 1)];
 
 		for (i = 1; i < totaltasks; i++) {
-			MPI_Irecv(&allderr[i*NGRID / totaltasks],NGRID/totaltasks, MPI_DOUBLE, i,
-					i * 1000 + ROOT, MPI_COMM_WORLD, &reqs[0]);
+			MPI_Irecv(&allderr[i * NGRID / totaltasks], NGRID / totaltasks,
+			MPI_DOUBLE, i, i * 1000 + ROOT, MPI_COMM_WORLD, &reqs[0]);
 
-			MPI_Irecv(&alliintg_err[i], 1, MPI_DOUBLE, i,
-					i * 1000 + ROOT, MPI_COMM_WORLD, &reqs[1]);
+			MPI_Irecv(&alliintg[i], 1, MPI_DOUBLE, i, i * 1000 + ROOT,
+			MPI_COMM_WORLD, &reqs[1]);
 		}
 
-		for(i=0;i<NGRID/totaltasks;i++){
-			allderr[i] = derr[i+1];
+		for (i = 0; i < NGRID / totaltasks; i++) {
+			allderr[i] = derr[i + 1];
 		}
-		alliintg_err[0] = intg_err;
-		MPI_Waitall(2*(totaltasks -1),reqs,stats);
 
-		for(i = 0;i < NGRID ;i++){
-			printf("%f \n" , allderr[i]);
+		for (i = 1; i <totaltasks; i++) {
+			intg += alliintg[i];
+		}
+
+		MPI_Waitall(2 * (totaltasks - 1), reqs, stats);
+
+		//find the average error
+		for (i = 0; i < NGRID; i++)
+			davg_err += derr[i];
+
+		davg_err /= (FP_PREC) NGRID;
+
+		dstd_dev = 0.0;
+		for (i = 0; i < NGRID; i++) {
+			dstd_dev += pow(derr[i] - davg_err, 2);
+		}
+		dstd_dev = sqrt(dstd_dev / (FP_PREC) NGRID);
+
+		intg_err = fabs((ifn(XI, XF) - intg) / ifn(XI, XF));
+
+		//print_error_data(NGRID, davg_err, dstd_dev, &xc[1], derr, intg_err);
+		fprintf(stdout, "%e\n%e\n%e\n", davg_err, dstd_dev, intg_err);
+		for (i = 0; i < NGRID; i++) {
+			fprintf(stdout, "%e %e \n", i, allderr[i]);
 		}
 
 	}
@@ -160,7 +180,7 @@ void print_function_data(int np, FP_PREC *x, FP_PREC *y, FP_PREC *dydx) {
 void print_error_data(int np, FP_PREC avgerr, FP_PREC stdd, FP_PREC *x,
 		FP_PREC *err, FP_PREC ierr) {
 	int i;
-	FILE *fp = fopen("err.dat", "w");
+	FILE *fp = fopen("err2.dat", "w");
 
 	fprintf(fp, "%e\n%e\n%e\n", avgerr, stdd, ierr);
 	for (i = 0; i < np; i++) {
