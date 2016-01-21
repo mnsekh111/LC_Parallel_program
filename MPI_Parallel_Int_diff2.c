@@ -75,11 +75,13 @@ int main(int argc, char *argv[]) {
 
 	MPI_Waitall(4, reqs, stats);
 
+	printf("waiting complete ");
 	dx = xc[2] - xc[1];
 	if (taskId == ROOT) {
 		xc[0] = xc[1] - dx;
 		yc[0] = fn(xc[0]);
 	}
+
 	if (taskId == totaltasks - 1) {
 		xc[NGRID / totaltasks + 1] = xc[NGRID / totaltasks] + dx;
 		yc[NGRID / totaltasks + 1] = fn(xc[NGRID / totaltasks + 1]);
@@ -102,14 +104,15 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (taskId != ROOT) {
+
+		MPI_Request nreqs[2];
+		MPI_Status nstats[2];
+
 		MPI_Isend(&derr[0], NGRID / totaltasks, MPI_DOUBLE, ROOT,
 				taskId * 1000 + ROOT,
-				MPI_COMM_WORLD, &reqs[0]);
+				MPI_COMM_WORLD, &nreqs[0]);
 		MPI_Isend(&intg, 1, MPI_DOUBLE, next_task, taskId * 1000 + ROOT,
-		MPI_COMM_WORLD, &reqs[1]);
-
-		MPI_Wait(&reqs[0], &stats[0]);
-		MPI_Wait(&reqs[1], &stats[1]);
+		MPI_COMM_WORLD, &nreqs[1]);
 
 	} else {
 
@@ -119,15 +122,16 @@ int main(int argc, char *argv[]) {
 		FP_PREC davg_err = 0.0;
 		FP_PREC dstd_dev = 0.0;
 		FP_PREC intg_err = 0.0;
-		MPI_Request reqs[2 * (totaltasks - 1)];
-		MPI_Status stats[2 * (totaltasks - 1)];
+		MPI_Request nreqs[2 * (totaltasks - 1)];
+		MPI_Status nstats[2 * (totaltasks - 1)];
 
 		for (i = 1; i < totaltasks; i++) {
 			MPI_Irecv(&allderr[i * NGRID / totaltasks], NGRID / totaltasks,
-			MPI_DOUBLE, i, i * 1000 + ROOT, MPI_COMM_WORLD, &reqs[0]);
+			MPI_DOUBLE, i, i * 1000 + ROOT, MPI_COMM_WORLD,
+					&nreqs[2 * (i - 1)]);
 
 			MPI_Irecv(&alliintg[i], 1, MPI_DOUBLE, i, i * 1000 + ROOT,
-			MPI_COMM_WORLD, &reqs[1]);
+			MPI_COMM_WORLD, &nreqs[2 * (i - 1) + 1]);
 		}
 
 		for (i = 0; i < NGRID / totaltasks; i++) {
@@ -138,7 +142,7 @@ int main(int argc, char *argv[]) {
 			intg += alliintg[i];
 		}
 
-		MPI_Waitall(2 * (totaltasks - 1), reqs, stats);
+		MPI_Waitall(2 * (totaltasks - 1), nreqs, nstats);
 
 		//find the average error
 		for (i = 0; i < NGRID; i++)
@@ -159,7 +163,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		//print_error_data(NGRID, davg_err, dstd_dev, &xc[1], derr, intg_err);
-		print_error_data(NGRID,davg_err,dstd_dev,allxc,allderr,intg_err);
+		print_error_data(NGRID, davg_err, dstd_dev, allxc, allderr, intg_err);
 	}
 
 	MPI_Finalize();
