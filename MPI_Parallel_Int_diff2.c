@@ -74,8 +74,6 @@ int main(int argc, char *argv[]) {
 			taskId * 1000 + next_task, MPI_COMM_WORLD, &reqs[3]);
 
 	MPI_Waitall(4, reqs, stats);
-
-	printf("waiting complete ");
 	dx = xc[2] - xc[1];
 	if (taskId == ROOT) {
 		xc[0] = xc[1] - dx;
@@ -108,17 +106,20 @@ int main(int argc, char *argv[]) {
 		MPI_Request nreqs[2];
 		MPI_Status nstats[2];
 
-		MPI_Isend(&derr[0], NGRID / totaltasks, MPI_DOUBLE, ROOT,
+		MPI_Isend(derr + 1, NGRID / totaltasks, MPI_DOUBLE, ROOT,
 				taskId * 1000 + ROOT,
 				MPI_COMM_WORLD, &nreqs[0]);
-		MPI_Isend(&intg, 1, MPI_DOUBLE, next_task, taskId * 1000 + ROOT,
+		MPI_Isend(&intg, 1, MPI_DOUBLE, ROOT, taskId * 1000 + ROOT,
 		MPI_COMM_WORLD, &nreqs[1]);
+		MPI_Waitall(2, nreqs, nstats);
 
-	} else {
+	}
+
+	else {
 
 		FP_PREC allxc[NGRID];
 		FP_PREC allderr[NGRID];
-		FP_PREC alliintg[totaltasks];
+		FP_PREC allintg[totaltasks];
 		FP_PREC davg_err = 0.0;
 		FP_PREC dstd_dev = 0.0;
 		FP_PREC intg_err = 0.0;
@@ -126,11 +127,11 @@ int main(int argc, char *argv[]) {
 		MPI_Status nstats[2 * (totaltasks - 1)];
 
 		for (i = 1; i < totaltasks; i++) {
-			MPI_Irecv(&allderr[i * NGRID / totaltasks], NGRID / totaltasks,
+			MPI_Irecv(allderr + (i * NGRID / totaltasks), NGRID / totaltasks,
 			MPI_DOUBLE, i, i * 1000 + ROOT, MPI_COMM_WORLD,
 					&nreqs[2 * (i - 1)]);
 
-			MPI_Irecv(&alliintg[i], 1, MPI_DOUBLE, i, i * 1000 + ROOT,
+			MPI_Irecv(allintg + i, 1, MPI_DOUBLE, i, i * 1000 + ROOT,
 			MPI_COMM_WORLD, &nreqs[2 * (i - 1) + 1]);
 		}
 
@@ -138,21 +139,21 @@ int main(int argc, char *argv[]) {
 			allderr[i] = derr[i + 1];
 		}
 
-		for (i = 1; i < totaltasks; i++) {
-			intg += alliintg[i];
-		}
-
 		MPI_Waitall(2 * (totaltasks - 1), nreqs, nstats);
 
 		//find the average error
 		for (i = 0; i < NGRID; i++)
-			davg_err += derr[i];
+			davg_err += allderr[i];
+
+		for (i = 1; i < totaltasks; i++) {
+			intg += allintg[i];
+		}
 
 		davg_err /= (FP_PREC) NGRID;
 
 		dstd_dev = 0.0;
 		for (i = 0; i < NGRID; i++) {
-			dstd_dev += pow(derr[i] - davg_err, 2);
+			dstd_dev += pow(allderr[i] - davg_err, 2);
 		}
 		dstd_dev = sqrt(dstd_dev / (FP_PREC) NGRID);
 
