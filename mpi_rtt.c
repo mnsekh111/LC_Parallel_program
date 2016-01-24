@@ -26,8 +26,8 @@ int main(int argc, char * argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &task_id);
 	MPI_Get_processor_name(processor_name, &len);
 
-	double table[MSG_SIZES][REPS];
-	printf("Number of processors %d\n", num_tasks);
+	double rtt_table[MSG_SIZES][REPS];
+	double avg_stddev_table[2 * MSG_SIZES];
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	int msg_size = 32;
@@ -37,9 +37,10 @@ int main(int argc, char * argv[]) {
 		dummy_send_data = (char *) malloc(msg_size);
 		dummy_rec_data = (char *) malloc(msg_size);
 		memset(dummy_send_data, 'A', msg_size - 1);
+		dummy_send_data[msg_size - 1] = '\0';
 
 		for (j = 0; j < num_tasks / 2; j++) {
-			if (task_id == j * 2 || task_id == j * 2 + 1) {
+			if ((task_id == (j * 2)) || (task_id == (j * 2) + 1)) {
 				avg_rtt = 0;
 				std_dev = 0;
 				for (k = 0; k < REPS; k++) {
@@ -49,32 +50,31 @@ int main(int argc, char * argv[]) {
 								task_id + 1, get_uniq_tag(task_id, k),
 								MPI_COMM_WORLD);
 						if (rc != MPI_SUCCESS) {
-							fprintf(stderr, "Send to %d failed\n", task_id + 1);
+							fprintf(stdout, "Send to %d failed\n", task_id + 1);
 							MPI_Abort(MPI_COMM_WORLD, rc);
 							exit(1);
 						}
 
 						rc = MPI_Recv(dummy_rec_data, msg_size, MPI_CHAR,
 								task_id + 1, get_uniq_tag(task_id + 1, k),
-								MPI_COMM_WORLD, &status);
-
+								MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 						if (rc != MPI_SUCCESS) {
-							fprintf(stderr, "Receive back from %d failed\n",
+							fprintf(stdout, "Receive back from %d failed\n",
 									task_id + 1);
 							MPI_Abort(MPI_COMM_WORLD, rc);
 							exit(1);
 						}
 
 						end_time = MPI_Wtime();
-						table[i][k] = end_time - start_time;
-						avg_rtt += table[i][k];
+						rtt_table[i][k] = end_time - start_time;
+						avg_rtt += rtt_table[i][k];
 
 					} else {
 						rc = MPI_Recv(dummy_rec_data, msg_size, MPI_CHAR,
 								task_id - 1, get_uniq_tag(task_id - 1, k),
-								MPI_COMM_WORLD, &status);
+								MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 						if (rc != MPI_SUCCESS) {
-							fprintf(stderr, "Receive from %d failed\n",
+							fprintf(stdout, "Receive from %d failed\n",
 									task_id - 1);
 							MPI_Abort(MPI_COMM_WORLD, rc);
 							exit(1);
@@ -84,7 +84,7 @@ int main(int argc, char * argv[]) {
 								task_id - 1, get_uniq_tag(task_id, k),
 								MPI_COMM_WORLD);
 						if (rc != MPI_SUCCESS) {
-							fprintf(stderr, "Send back to %d failed\n",
+							fprintf(stdout, "Send back to %d failed\n",
 									task_id - 1);
 							MPI_Abort(MPI_COMM_WORLD, rc);
 							exit(1);
@@ -94,15 +94,14 @@ int main(int argc, char * argv[]) {
 				}
 
 				if (task_id % 2 == 0) {
-					//if (task_id == ROOT)
-					printf("\n%d ", msg_size);
-					avg_rtt/=REPS;
+					avg_rtt /= REPS;
 					for (k = 0; k < REPS; k++) {
-						std_dev += pow(fabs(avg_rtt - table[i][k]), 2);
+						std_dev += pow(fabs(avg_rtt - rtt_table[i][k]), 2);
 					}
 					std_dev /= REPS;
 					std_dev = sqrt(std_dev);
-					printf(" %f %f", avg_rtt, std_dev);
+					avg_stddev_table[2 * i] = avg_rtt;
+					avg_stddev_table[2 * i + 1] = std_dev;
 				}
 			}
 			MPI_Barrier(MPI_COMM_WORLD);
@@ -110,87 +109,20 @@ int main(int argc, char * argv[]) {
 		free(dummy_rec_data);
 		free(dummy_send_data);
 		msg_size *= 2;
-		//MPI_Barrier(MPI_COMM_WORLD);
 	}
 
-//for (k = 0; k < num_tasks / 2; k++) {
-//	if (task_id == curr_pair || task_id == curr_pair + 1) {
-//		for (j = 0; j < MSG_SIZES; j++) {
-//			avg_rtt = 0;
-//			std_dev = 0;
-//			for (i = 0; i < REPS; i++) {
-//				if (task_id % 2 == 0) {
-//					dummy_send_data = (char *) malloc(msg_size);
-//					dummy_rec_data = (char *) malloc(msg_size);
-//					memset(dummy_send_data, 'A', msg_size - 1);
-//					start_time = MPI_Wtime();
-//					rc = MPI_Send(dummy_send_data, msg_size, MPI_CHAR,
-//							task_id + 1, get_uniq_tag(task_id, i),
-//							MPI_COMM_WORLD);
-//					if (rc != MPI_SUCCESS) {
-//						fprintf(stderr, "Send to %d failed\n", task_id + 1);
-//						MPI_Abort(MPI_COMM_WORLD, rc);
-//						exit(1);
-//					}
-//
-//					//printf("Sent data from task %d\n",task_id);
-//					rc = MPI_Recv(dummy_rec_data, msg_size, MPI_CHAR,
-//							task_id + 1, get_uniq_tag(task_id + 1, i),
-//							MPI_COMM_WORLD, &status);
-//
-//					if (rc != MPI_SUCCESS) {
-//						fprintf(stderr, "Receive back from %d failed\n",
-//								task_id + 1);
-//						MPI_Abort(MPI_COMM_WORLD, rc);
-//						exit(1);
-//					}
-//
-////						printf("Received back %d bytes of data from task %d\n",
-////								strlen(dummy_rec_data), task_id + 1);
-//					end_time = MPI_Wtime();
-//					table[j][k][i] = end_time - start_time;
-//					avg_rtt += table[j][k][i];
-//					printf("Message size %d from %d to %d --> %f \n", j,
-//							task_id, task_id + 1, end_time - start_time);
-//					free(dummy_send_data);
-//				} else {
-//					dummy_rec_data = (char *) malloc(msg_size);
-//					memset(dummy_rec_data, ' ', msg_size - 1);
-//					rc = MPI_Recv(dummy_rec_data, msg_size, MPI_CHAR,
-//							task_id - 1, get_uniq_tag(task_id - 1, i),
-//							MPI_COMM_WORLD, &status);
-//					if (rc != MPI_SUCCESS) {
-//						fprintf(stderr, "Receive from %d failed\n",
-//								task_id - 1);
-//						MPI_Abort(MPI_COMM_WORLD, rc);
-//						exit(1);
-//					}
-//
-////						printf("Received data (tag:%d) from task %d\n",
-////								status.MPI_TAG, task_id - 1);
-//					rc = MPI_Send(dummy_rec_data, msg_size, MPI_CHAR,
-//							task_id - 1, get_uniq_tag(task_id, i),
-//							MPI_COMM_WORLD);
-//					if (rc != MPI_SUCCESS) {
-//						fprintf(stderr, "Send back to %d failed\n",
-//								task_id - 1);
-//						MPI_Abort(MPI_COMM_WORLD, rc);
-//						exit(1);
-//					}
-//					//printf("Sent data back to task %d\n",task_id - 1);
-//					free(dummy_rec_data);
-//				}
-//			}
-//
-//			for (l = 0; l < REPS; l++) {
-//				std_dev += pow(fabs(avg_rtt - table[]))
-//			}
-//			msg_size *= 2;
-//		}
-//	}
-//	MPI_Barrier(MPI_COMM_WORLD);
-//	curr_pair += 2;
-//}
+	if (task_id % 2 == 0) {
+		double*display_array = (double*) malloc(
+				num_tasks / 2 * sizeof(double) * 2 * MSG_SIZES);
+		MPI_Gather(avg_stddev_table, 2 * MSG_SIZES, MPI_DOUBLE, display_array,
+				2 * MSG_SIZES, MPI_DOUBLE, ROOT, MPI_COMM_WORLD);
+
+		if (task_id == ROOT) {
+			for (i = 0; i < num_tasks * MSG_SIZES; i += 2)
+				printf("%f %f\n", display_array[i], display_array[i + 1]);
+		}
+	}
+
 	MPI_Finalize();
 	return 0;
 }
