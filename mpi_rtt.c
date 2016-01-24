@@ -26,12 +26,28 @@ int main(int argc, char * argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &task_id);
 	MPI_Get_processor_name(processor_name, &len);
 
+//	for (i = 0; i < num_tasks; i++) {
+//		if (task_id == i)
+//			printf("Node %d = %s", task_id, processor_name);
+//		MPI_Barrier(MPI_COMM_WORLD);
+//	}
 	double rtt_table[MSG_SIZES][REPS];
-	double avg_stddev_table[2 * MSG_SIZES];
+	double avg_stddev_table[MSG_SIZES * 2];
 	MPI_Barrier(MPI_COMM_WORLD);
 
+	if (num_tasks % 2 != 0) {
+		//Ignoring the last node which has no pair
+		num_tasks--;
+	}
+
+	if (num_tasks == 0) {
+		//This condition occurs when number of tasks is either 0 or 1
+		//The program won't run
+		MPI_Finalize();
+		return 0;
+	}
+
 	int msg_size = 32;
-	int curr_pair = 0;
 
 	for (i = 0; i < MSG_SIZES; i++) {
 		dummy_send_data = (char *) malloc(msg_size);
@@ -94,11 +110,12 @@ int main(int argc, char * argv[]) {
 				}
 
 				if (task_id % 2 == 0) {
-					avg_rtt /= REPS;
-					for (k = 0; k < REPS; k++) {
+					avg_rtt -= rtt_table[i][0];
+					avg_rtt /= (REPS - 1);
+					for (k = 1; k < REPS; k++) {
 						std_dev += pow(fabs(avg_rtt - rtt_table[i][k]), 2);
 					}
-					std_dev /= REPS;
+					std_dev /= (REPS - 1);
 					std_dev = sqrt(std_dev);
 					avg_stddev_table[2 * i] = avg_rtt;
 					avg_stddev_table[2 * i + 1] = std_dev;
@@ -111,16 +128,41 @@ int main(int argc, char * argv[]) {
 		msg_size *= 2;
 	}
 
-	if (task_id % 2 == 0) {
-		double*display_array = (double*) malloc(
-				num_tasks / 2 * sizeof(double) * 2 * MSG_SIZES);
-		MPI_Gather(avg_stddev_table, 2 * MSG_SIZES, MPI_DOUBLE, display_array,
-				2 * MSG_SIZES, MPI_DOUBLE, ROOT, MPI_COMM_WORLD);
-
-		if (task_id == ROOT) {
-			for (i = 0; i < num_tasks * MSG_SIZES; i += 2)
-				printf("%f %f\n", display_array[i], display_array[i + 1]);
+	if (task_id == ROOT) {
+		double display_array[num_tasks / 2][MSG_SIZES * 2];
+		//double*display_array = (double*) malloc(
+		//num_tasks / 2 * sizeof(double) * 2 * MSG_SIZES);
+		for (i = 1; i < num_tasks / 2; i++) {
+			MPI_Recv(display_array[i], 2 * MSG_SIZES,
+			MPI_DOUBLE, i * 2, get_uniq_tag(i * 2, ROOT),
+			MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		}
+
+		for (j = 0; j < 2 * MSG_SIZES; j++)
+			display_array[ROOT][j] = avg_stddev_table[j];
+
+		msg_size = 32;
+
+		for (i = 0; i < MSG_SIZES; i++, msg_size *= 2) {
+			printf("%d ", msg_size);
+			for (j = 0; j < num_tasks / 2; j++) {
+				printf("%e %e ", display_array[j][2 * i],
+						display_array[j][2 * i + 1]);
+			}
+			printf("\n");
+		}
+	}
+
+	if (task_id % 2 == 0) {
+//		printf("Task %d\n", task_id);
+//		for (i = 0; i < 2 * MSG_SIZES; i += 2) {
+//			printf("%f %f ", avg_stddev_table[i], avg_stddev_table[i + 1]);
+//			printf("\n");
+//		}
+
+		if (task_id != ROOT)
+			MPI_Send(avg_stddev_table, 2 * MSG_SIZES, MPI_DOUBLE, ROOT,
+					get_uniq_tag(task_id, ROOT), MPI_COMM_WORLD);
 	}
 
 	MPI_Finalize();
