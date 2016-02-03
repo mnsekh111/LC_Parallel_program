@@ -32,15 +32,17 @@ int main(int, char**);
 
 int main(int argc, char *argv[]) {
 	int taskId, totaltasks, i, j;
-
+	int chunk;
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &taskId);
 	MPI_Comm_size(MPI_COMM_WORLD, &totaltasks);
 
-	FP_PREC xc[NGRID / totaltasks + 2];
-	FP_PREC yc[NGRID / totaltasks + 2];
-	FP_PREC dyc[NGRID / totaltasks + 2];
-	FP_PREC derr[NGRID / totaltasks + 2];
+	chunk = NGRID/totaltasks;
+
+	FP_PREC xc[chunk + 2];
+	FP_PREC yc[chunk + 2];
+	FP_PREC dyc[chunk + 2];
+	FP_PREC derr[chunk + 2];
 
 	FP_PREC intg;
 	FP_PREC dx;
@@ -54,20 +56,20 @@ int main(int argc, char *argv[]) {
 	MPI_Irecv(&yc[0], 1, MPI_DOUBLE, prev_task, prev_task * 1000 + taskId,
 	MPI_COMM_WORLD, &reqs[0]);
 
-	MPI_Irecv(&yc[NGRID / totaltasks + 1], 1, MPI_DOUBLE, next_task,
+	MPI_Irecv(&yc[chunk + 1], 1, MPI_DOUBLE, next_task,
 			next_task * 1000 + taskId, MPI_COMM_WORLD, &reqs[1]);
 
-	for (i = 1; i <= NGRID / totaltasks + 1; i++) {
+	for (i = 1; i <= chunk + 1; i++) {
 		xc[i] = (XI + (XF - XI) * (FP_PREC) (i - 1) / (FP_PREC) (NGRID - 1))
-				+ taskId * NGRID / totaltasks;
+				+ taskId * chunk;
 	}
 
 	//define the function
-	for (i = 1; i <= NGRID / totaltasks; i++) {
+	for (i = 1; i <= chunk; i++) {
 		yc[i] = fn(xc[i]);
 	}
 
-	MPI_Isend(&yc[NGRID / totaltasks], 1, MPI_DOUBLE, next_task,
+	MPI_Isend(&yc[chunk], 1, MPI_DOUBLE, next_task,
 			taskId * 1000 + next_task, MPI_COMM_WORLD, &reqs[3]);
 
 	MPI_Isend(&yc[1], 1, MPI_DOUBLE, prev_task, taskId * 1000 + prev_task,
@@ -81,26 +83,26 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (taskId == totaltasks - 1) {
-		xc[NGRID / totaltasks + 1] = xc[NGRID / totaltasks] + dx;
-		yc[NGRID / totaltasks + 1] = fn(xc[NGRID / totaltasks + 1]);
+		xc[chunk + 1] = xc[chunk] + dx;
+		yc[chunk + 1] = fn(xc[chunk + 1]);
 	}
 
 	//compute the derivative using first-order finite differencing
-	for (i = 1; i <= NGRID / totaltasks; i++) {
+	for (i = 1; i <= chunk; i++) {
 		dyc[i] = (yc[i + 1] - yc[i - 1]) / (2.0 * dx);
 	}
 
 	//compute the integral using Trapazoidal rule
 	intg = 0.0;
-	for (i = 1; i <=NGRID / totaltasks; i++) {
-		if (taskId == totaltasks-1 && i == NGRID/totaltasks)
+	for (i = 1; i <=chunk; i++) {
+		if (taskId == totaltasks-1 && i == chunk)
 			continue;
 		intg += 0.5 * (xc[i + 1] - xc[i]) * (yc[i + 1] + yc[i]);
 	}
 
 	//compute the errors
-	for (i = 1; i <= NGRID / totaltasks; i++) {
-		if (i - 1 != NGRID / totaltasks - 1)
+	for (i = 1; i <= chunk; i++) {
+		if (i - 1 != chunk - 1)
 			derr[i] = fabs((dyc[i] - dfn(xc[i])) / dfn(xc[i]));
 	}
 
@@ -110,7 +112,7 @@ int main(int argc, char *argv[]) {
 		MPI_Request nreqs[2];
 		MPI_Status nstats[2];
 
-		MPI_Isend(derr + 1, NGRID / totaltasks, MPI_DOUBLE, ROOT,
+		MPI_Isend(derr + 1, chunk, MPI_DOUBLE, ROOT,
 				taskId * 1000 + ROOT,
 				MPI_COMM_WORLD, &nreqs[0]);
 		MPI_Isend(&intg, 1, MPI_DOUBLE, ROOT, taskId * 1000 + ROOT,
@@ -130,7 +132,7 @@ int main(int argc, char *argv[]) {
 		MPI_Status nstats[2 * (totaltasks - 1)];
 
 		for (i = 1; i < totaltasks; i++) {
-			MPI_Irecv(allderr + (i * NGRID / totaltasks), NGRID / totaltasks,
+			MPI_Irecv(allderr + (i * chunk), chunk,
 			MPI_DOUBLE, i, i * 1000 + ROOT, MPI_COMM_WORLD,
 					&nreqs[2 * (i - 1)]);
 
@@ -138,7 +140,7 @@ int main(int argc, char *argv[]) {
 			MPI_COMM_WORLD, &nreqs[2 * (i - 1) + 1]);
 		}
 
-		for (i = 0; i < NGRID / totaltasks; i++) {
+		for (i = 0; i < chunk; i++) {
 			allderr[i] = derr[i + 1];
 		}
 
