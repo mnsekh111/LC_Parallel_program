@@ -80,18 +80,12 @@ int main(int argc, char *argv[]) {
 	if (taskId == ROOT) {
 		xc[0] = xc[1] - dx;
 		yc[0] = fn(xc[0]);
-		printf("<<<<%f %f>>R>>\n", xc[0], yc[0]);
-		printf("<<<<%f %f>>R>>\n", xc[NGRID/totaltasks+1], yc[NGRID/totaltasks+1]);
 	}
 
 
 	if (taskId == totaltasks - 1) {
 		xc[NGRID / totaltasks + 1] = xc[NGRID / totaltasks] + dx;
 		yc[NGRID / totaltasks + 1] = fn(xc[NGRID / totaltasks + 1]);
-		printf("<<<<%f %f>>NR>>\n", xc[NGRID / totaltasks + 1],
-				yc[NGRID / totaltasks + 1]);
-		printf("<<<<%f %f>>NR>>\n", xc[0],
-						yc[0]);
 	}
 
 	//compute the derivative using first-order finite differencing
@@ -121,14 +115,10 @@ int main(int argc, char *argv[]) {
 		MPI_Isend(&intg, 1, MPI_DOUBLE, ROOT, taskId * 1000 + ROOT,
 		MPI_COMM_WORLD, &nreqs[1]);
 		MPI_Waitall(2, nreqs, nstats);
-		for (i = 1; i <= NGRID / totaltasks; i++)
-			printf("%f----->\n", derr[i]);
 	}
 
 	else {
 
-		for (i = 1; i <= NGRID / totaltasks; i++)
-			printf("%f********>\n", derr[i]);
 		FP_PREC allxc[NGRID];
 		FP_PREC allderr[NGRID];
 		FP_PREC allintg[totaltasks];
