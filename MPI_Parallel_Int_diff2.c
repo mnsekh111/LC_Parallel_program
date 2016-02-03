@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
 	MPI_Irecv(&yc[NGRID / totaltasks + 1], 1, MPI_DOUBLE, next_task,
 			next_task * 1000 + taskId, MPI_COMM_WORLD, &reqs[1]);
 
-	for (i = 1; i <= NGRID / totaltasks; i++) {
+	for (i = 1; i <= NGRID / totaltasks + 1; i++) {
 		xc[i] = (XI + (XF - XI) * (FP_PREC) (i - 1) / (FP_PREC) (NGRID - 1))
 				+ taskId * NGRID / totaltasks;
 	}
@@ -73,15 +73,12 @@ int main(int argc, char *argv[]) {
 	MPI_Isend(&yc[1], 1, MPI_DOUBLE, prev_task, taskId * 1000 + prev_task,
 	MPI_COMM_WORLD, &reqs[2]);
 
-
-
 	MPI_Waitall(4, reqs, stats);
 	dx = xc[2] - xc[1];
 	if (taskId == ROOT) {
 		xc[0] = xc[1] - dx;
 		yc[0] = fn(xc[0]);
 	}
-
 
 	if (taskId == totaltasks - 1) {
 		xc[NGRID / totaltasks + 1] = xc[NGRID / totaltasks] + dx;
@@ -95,15 +92,19 @@ int main(int argc, char *argv[]) {
 
 	//compute the integral using Trapazoidal rule
 	intg = 0.0;
-	for (i = 1; i < NGRID / totaltasks; i++) {
+	for (i = 1; i <=NGRID / totaltasks; i++) {
+		if (taskId == totaltasks-1 && i == NGRID/totaltasks)
+			continue;
 		intg += 0.5 * (xc[i + 1] - xc[i]) * (yc[i + 1] + yc[i]);
 	}
 
 	//compute the errors
 	for (i = 1; i <= NGRID / totaltasks; i++) {
-		derr[i] = fabs((dyc[i] - dfn(xc[i])) / dfn(xc[i]));
+		if (i - 1 != NGRID / totaltasks - 1)
+			derr[i] = fabs((dyc[i] - dfn(xc[i])) / dfn(xc[i]));
 	}
 
+	printf("%d ---> %f\n", taskId, intg);
 	if (taskId != ROOT) {
 
 		MPI_Request nreqs[2];
@@ -143,8 +144,6 @@ int main(int argc, char *argv[]) {
 
 		MPI_Waitall(2 * (totaltasks - 1), nreqs, nstats);
 
-		for (i = 0; i < NGRID; i++)
-			printf("%d %f\n", i, allderr[i]);
 		//find the average error
 		for (i = 0; i < NGRID; i++)
 			davg_err += allderr[i];
@@ -153,6 +152,8 @@ int main(int argc, char *argv[]) {
 			intg += allintg[i];
 		}
 
+		for (i = 1; i < totaltasks; i++)
+			printf("%d **** %f\n", i, allintg[i]);
 		davg_err /= (FP_PREC) NGRID;
 
 		dstd_dev = 0.0;
@@ -163,6 +164,7 @@ int main(int argc, char *argv[]) {
 
 		intg_err = fabs((ifn(XI, XF) - intg) / ifn(XI, XF));
 
+		printf("ORIG %f %f\n", ifn(XI, XF), intg);
 		for (i = 0; i < NGRID; i++) {
 			allxc[i] = XI + (XF - XI) * (FP_PREC) i / (FP_PREC) (NGRID - 1);
 		}
