@@ -50,14 +50,15 @@ int main(int argc, char *argv[]) {
 	int prev_task = (taskId - 1) < 0 ? totaltasks - 1 : taskId - 1;
 	int next_task = (taskId + 1) % totaltasks;
 
-	MPI_Request reqs[4];
-	MPI_Status stats[4];
+	MPI_Status stats[2];
 
-	MPI_Irecv(&yc[0], 1, MPI_DOUBLE, prev_task, prev_task * 1000 + taskId,
-	MPI_COMM_WORLD, &reqs[0]);
+	MPI_Send(&yc[chunk], 1, MPI_DOUBLE, next_task, taskId * 1000 + next_task,
+			MPI_COMM_WORLD);
 
-	MPI_Irecv(&yc[chunk + 1], 1, MPI_DOUBLE, next_task,
-			next_task * 1000 + taskId, MPI_COMM_WORLD, &reqs[1]);
+	MPI_Send(&yc[1], 1, MPI_DOUBLE, prev_task, taskId * 1000 + prev_task,
+	MPI_COMM_WORLD);
+
+
 
 	for (i = 1; i <= chunk + 1; i++) {
 		xc[i] = (XI + (XF - XI) * (FP_PREC) (i - 1) / (FP_PREC) (NGRID - 1))
@@ -69,13 +70,13 @@ int main(int argc, char *argv[]) {
 		yc[i] = fn(xc[i]);
 	}
 
-	MPI_Isend(&yc[chunk], 1, MPI_DOUBLE, next_task, taskId * 1000 + next_task,
-			MPI_COMM_WORLD, &reqs[3]);
 
-	MPI_Isend(&yc[1], 1, MPI_DOUBLE, prev_task, taskId * 1000 + prev_task,
-	MPI_COMM_WORLD, &reqs[2]);
+	MPI_Recv(&yc[0], 1, MPI_DOUBLE, prev_task, prev_task * 1000 + taskId,
+	MPI_COMM_WORLD, &stats[0]);
 
-	MPI_Waitall(4, reqs, stats);
+	MPI_Recv(&yc[chunk + 1], 1, MPI_DOUBLE, next_task,
+			next_task * 1000 + taskId, MPI_COMM_WORLD, &stats[1]);
+
 	dx = xc[2] - xc[1];
 	if (taskId == ROOT) {
 		xc[0] = xc[1] - dx;
@@ -108,14 +109,10 @@ int main(int argc, char *argv[]) {
 
 	if (taskId != ROOT) {
 
-		MPI_Request nreqs[2];
-		MPI_Status nstats[2];
-
-		MPI_Isend(derr + 1, chunk, MPI_DOUBLE, ROOT, taskId * 1000 + ROOT,
-		MPI_COMM_WORLD, &nreqs[0]);
-		MPI_Isend(&intg, 1, MPI_DOUBLE, ROOT, taskId * 1000 + ROOT,
-		MPI_COMM_WORLD, &nreqs[1]);
-		MPI_Waitall(2, nreqs, nstats);
+		MPI_Send(derr + 1, chunk, MPI_DOUBLE, ROOT, taskId * 1000 + ROOT,
+		MPI_COMM_WORLD);
+		MPI_Send(&intg, 1, MPI_DOUBLE, ROOT, taskId * 1000 + ROOT,
+		MPI_COMM_WORLD);
 	}
 
 	else {
@@ -126,23 +123,20 @@ int main(int argc, char *argv[]) {
 		FP_PREC davg_err = 0.0;
 		FP_PREC dstd_dev = 0.0;
 		FP_PREC intg_err = 0.0;
-		MPI_Request nreqs[2 * (totaltasks - 1)];
-		MPI_Status nstats[2 * (totaltasks - 1)];
+		MPI_Status nstats[2];
 
 		for (i = 1; i < totaltasks; i++) {
-			MPI_Irecv(allderr + (i * chunk), chunk,
+			MPI_Recv(allderr + (i * chunk), chunk,
 			MPI_DOUBLE, i, i * 1000 + ROOT, MPI_COMM_WORLD,
-					&nreqs[2 * (i - 1)]);
+					&nstats[0]);
 
-			MPI_Irecv(allintg + i, 1, MPI_DOUBLE, i, i * 1000 + ROOT,
-			MPI_COMM_WORLD, &nreqs[2 * (i - 1) + 1]);
+			MPI_Recv(allintg + i, 1, MPI_DOUBLE, i, i * 1000 + ROOT,
+			MPI_COMM_WORLD, &nstats[1]);
 		}
 
 		for (i = 0; i < chunk; i++) {
 			allderr[i] = derr[i + 1];
 		}
-
-		MPI_Waitall(2 * (totaltasks - 1), nreqs, nstats);
 
 		//find the average error
 		for (i = 0; i < NGRID; i++)
